@@ -27,6 +27,7 @@
 #include "eye_calibration.hpp"
 #include "openvr_menu.hpp"
 #include "graphics_observer.hpp"
+#include "runtime.hpp"
 #include "ngx_evaluation_extent.hpp"
 #include "motion_region.hpp"
 #include "mock_ngx_parameters.hpp"
@@ -36,6 +37,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
 #include <cstring>
 #include <iostream>
 #include <limits>
@@ -49,6 +51,9 @@ std::uint64_t observe_native_resource(ID3D12Resource* resource) noexcept { retur
 bool initialize_native_observer(ID3D12Device*, ID3D12CommandQueue*) noexcept { return true; }
 
 void trace_event(const char*, ...) noexcept {}
+void log_error(const char* message) noexcept {
+    std::fprintf(stderr, "%s\n", message);
+}
 // Runtime discovery is excluded from deterministic coordinator tests. Live
 // OpenVR acquisition is tested separately, with snapshots exercising shared policy here.
 const CheekyGazeSnapshotV1* test_openvr_snapshot{};
