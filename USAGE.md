@@ -2,6 +2,19 @@
 
 Start with the [installation guide](README.md#installation). This page contains the detailed control reference.
 
+## Diagnostic logging
+
+**Enable diagnostic logging** is in standalone's **Diagnostics** tab and UEVR's
+**Support** section. It defaults to on. Turning it off suppresses routine Cheeky
+traces across the processing runtime, host and matching OpenXR layer; warnings,
+errors and emergency crash diagnostics remain enabled. The saved per-game INI
+key is `LoggingEnabled`. Standalone applies edits automatically; UEVR uses its
+normal edit/apply behavior. No restart is needed.
+
+Turn it on before reproducing a problem and collecting a support ZIP. Existing
+logs are not deleted, and a few loader/startup messages can precede loading the
+saved setting. This option does not control the game's or UEVR's own logging.
+
 For **UEVR AFW**, use the [AFW setup and validation guide](uevr/README.md#afw-routing-experiment). That DX12 path supports SR, RR and NR. With AFW coverage controls off, it uses the configured per-eye region and ordinary eye calibration. Optional manual/automatic AFW coverage includes both possible source eyes. Effective coverage can exceed the stored fovea dimensions; the AFW banner reports SR coverage, while NR status reports its processing region and working resolution.
 
 ## Controls

@@ -74,3 +74,17 @@ cannot_save_disable.write_failure = true; cannot_save_disable.toggle = false; ca
 assert(cannot_save_disable.events[#cannot_save_disable.events][2] == "false", "Read-only profile must not prevent disabling this session")
 assert(cannot_save_disable.config == "disableMod=0\n", "Failed save must be reported as session-only")
 print("PASS: UEVR Lua loader defaults, persistence, delayed handshake, disable and error handling")
+local logging = fixture("disableMod=0\n")
+logging.receive(state_event, "enabled")
+logging.snapshot = {protocol = 1, ready = true, settings = {LoggingEnabled = true}}
+logging.receive(snapshot_event, "snapshot")
+logging.trees = {["Cheeky Foveated DLSS"] = true, ["Support"] = true}
+logging.edits = {["Enable diagnostic logging"] = false}
+logging.panel()
+assert(logging.events[#logging.events][2]:find("LoggingEnabled=false", 1, true),
+    "Logging checkbox must reach the native apply transaction")
+logging.snapshot.settings.LoggingEnabled = nil
+logging.receive(snapshot_event, "older runtime")
+logging.checks = {}; logging.panel()
+assert(logging.checks["Enable diagnostic logging"] == nil, "Older runtimes must not show logging controls")
+print("PASS: UEVR Lua loader defaults, logging, persistence, delayed handshake, disable and error handling")

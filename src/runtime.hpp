@@ -2,6 +2,9 @@
 
 #include <Windows.h>
 #include <cstdint>
+#include <cstdarg>
+#include <cstdio>
+#include "../shared/logging_policy.hpp"
 
 struct ID3D12CommandQueue;
 struct ID3D12GraphicsCommandList;
@@ -14,6 +17,14 @@ void log_info(const char* message) noexcept;
 void log_warning(const char* message) noexcept;
 void log_error(const char* message) noexcept;
 void trace_event(const char* format, ...) noexcept;
+inline void trace_error(const char* format, ...) noexcept {
+    char message[3072]{};
+    va_list args;
+    va_start(args, format);
+    vsnprintf_s(message, sizeof(message), _TRUNCATE, format, args);
+    va_end(args);
+    log_error(message);
+}
 void close_trace_log() noexcept;
 
 void note_d3d12_command_list_submission(

@@ -166,6 +166,13 @@ Add `--check` to verify that the checked-in bytecode matches its sources.
 
 ## Tests
 
+`CheekyRuntimeHostTests --logging` (also with `--uevr`) checks the live
+process-wide logging switch, saved settings, zero bytes written for repeated
+routine traces, retained warnings and re-enabling. `--conflict` also checks error
+logging with routine logging off. `CheekyOpenXRBindingTests --logging` checks
+OpenXR and FG worker error retention and live re-enable. The existing settings,
+standalone UI and Lua loader tests cover persistence and the two controls.
+
 The native suites exercise GPU processing, eye calibration, the OpenXR layer, UEVR host lifecycle and late NGX/Streamline attachment using local fixtures. They do not launch games or evaluate NVIDIA DLSS.
 
 Additional checks:

@@ -156,13 +156,15 @@ struct Presenter {
     FrameLayers frame_layers;
     CheekyFgState state{CheekyFgState::waiting_for_history};
     void (*trace)(const char*) noexcept {};
+    void (*error_trace)(const char*) noexcept {};
     bool capture_logged{}, ngx_logged{}, generation_logged{}, layout_logged{}, last_layout_accepted{};
     const char* last_error_stage{};
     long long last_error_code{};
     void failure(const char* stage,long long code) noexcept {
-        if(!trace||(last_error_stage&&!std::strcmp(last_error_stage,stage)&&last_error_code==code))return;
+        const auto sink=error_trace?error_trace:trace;
+        if(!sink||(last_error_stage&&!std::strcmp(last_error_stage,stage)&&last_error_code==code))return;
         char text[224]{};sprintf_s(text,"DLSS-FG %s failed: code=%lld (0x%llx); preserving native presentation",stage,code,code);
-        trace(text);last_error_stage=stage;last_error_code=code;
+        sink(text);last_error_stage=stage;last_error_code=code;
     }
     virtual const char* diagnostic_text() const noexcept {return worker.diagnostic;}
     virtual ~Presenter(){reset();}
@@ -247,6 +249,7 @@ struct Presenter {
         std::lock_guard lock(mx);
         if(!original||!width||!height)return false;
         worker.trace=trace;
+        worker.error_trace=error_trace;
         if(worker.ngx_required&&!worker.probe(device.Get())) {state=worker.capability_ready?CheekyFgState::generation_failed:CheekyFgState::ngx_unavailable;return false;}
         auto desc=original->GetDesc();if(desc.Dimension!=D3D12_RESOURCE_DIMENSION_TEXTURE2D||
             desc.SampleDesc.Count!=1||desc.DepthOrArraySize!=array_size)return false;

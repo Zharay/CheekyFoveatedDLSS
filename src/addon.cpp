@@ -767,6 +767,7 @@ void draw_openxr_gaze_diagnostics() {
 
 void load_settings_from_reshade() noexcept {
     auto settings = current_settings();
+    static_cast<void>(reshade::get_config_value(nullptr, config_section, "LoggingEnabled", settings.logging_enabled));
     static_cast<void>(reshade::get_config_value(nullptr,config_section,"FgForceReflexOff",settings.fg.force_reflex_off));
     static_cast<void>(reshade::get_config_value(
         nullptr, config_section, "D3D12LowerHook", settings.d3d12_lower_hook
@@ -980,6 +981,7 @@ void load_settings_from_reshade() noexcept {
 }
 
 void save_settings_to_reshade(const Settings& settings) noexcept {
+    reshade::set_config_value(nullptr, config_section, "LoggingEnabled", settings.logging_enabled);
     reshade::set_config_value(nullptr,config_section,"FgForceReflexOff",settings.fg.force_reflex_off);
     reshade::set_config_value(nullptr, config_section, "D3D12LowerHook", settings.d3d12_lower_hook);
     reshade::set_config_value(
@@ -2164,21 +2166,18 @@ void set_addon_modules(
     }
 }
 
-void trace_event(const char* const format, ...) noexcept {
+void write_trace(const char* const format, va_list arguments) noexcept {
     if (format == nullptr) return;
     const auto handle = trace_log.load(std::memory_order_acquire);
     if (handle == nullptr || handle == INVALID_HANDLE_VALUE) return;
 
     std::array<char, 2048U> message{};
-    va_list arguments;
-    va_start(arguments, format);
     const auto message_length = std::vsnprintf(
         message.data(),
         message.size(),
         format,
         arguments
     );
-    va_end(arguments);
     if (message_length < 0) return;
 
     SYSTEMTIME time{};
@@ -2208,6 +2207,22 @@ void trace_event(const char* const format, ...) noexcept {
     ReleaseSRWLockExclusive(&trace_log_lock);
 }
 
+void trace_event(const char* const format, ...) noexcept {
+    if (!cheeky::logging::enabled()) return;
+    va_list arguments;
+    va_start(arguments, format);
+    write_trace(format, arguments);
+    va_end(arguments);
+}
+
+void trace_level(int level, const char* format, ...) noexcept {
+    if (!cheeky::logging::should_log(level)) return;
+    va_list arguments;
+    va_start(arguments, format);
+    write_trace(format, arguments);
+    va_end(arguments);
+}
+
 void close_trace_log() noexcept {
     const auto handle = trace_log.exchange(nullptr, std::memory_order_acq_rel);
     if (handle != nullptr && handle != INVALID_HANDLE_VALUE) {
@@ -2217,7 +2232,8 @@ void close_trace_log() noexcept {
 }
 
 void log_message(const int level, const char* const message) noexcept {
-    trace_event("ReShade log level=%d: %s", level, message == nullptr ? "" : message);
+    if (!cheeky::logging::should_log(level)) return;
+    trace_level(level, "ReShade log level=%d: %s", level, message == nullptr ? "" : message);
     const auto logger = reshade_log.load(std::memory_order_acquire);
     const auto module = addon_module.load(std::memory_order_acquire);
     if (logger != nullptr && module != nullptr && message != nullptr) {

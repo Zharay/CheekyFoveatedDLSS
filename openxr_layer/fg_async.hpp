@@ -26,12 +26,13 @@ struct BufferedPresenter final : Presenter, BufferedGpuResources {
     cheeky::openxr::SubmissionDiagnostic last_submission_diagnostic;
     void note_submission_diagnostic(const cheeky::openxr::SubmissionDiagnostic& rejection) noexcept {
         if(rejection.same_rejection(last_submission_diagnostic))return;
-        if(trace){
+        const auto rejection_sink=error_trace?error_trace:trace;
+        if(rejection_sink){
             if(rejection.reason){char message[640]{};
                 sprintf_s(message,"OpenXR submission rejected: reason=%s layer=%d eye=%d structure_type=%d space=%p swapchain=%p view_count=%u",
                     rejection.reason,rejection.layer,rejection.eye,int(rejection.structure_type),
-                    rejection.space,rejection.swapchain,rejection.view_count);trace(message);}
-            else if(last_submission_diagnostic.reason)trace("OpenXR submission preparation recovered");
+                    rejection.space,rejection.swapchain,rejection.view_count);rejection_sink(message);}
+            else if(last_submission_diagnostic.reason&&trace)trace("OpenXR submission preparation recovered");
         }
         last_submission_diagnostic=rejection;
     }
@@ -469,6 +470,7 @@ struct BufferedPresenter final : Presenter, BufferedGpuResources {
     XrResult runtime_end_frame(const XrFrameEndInfo* end) {
         const auto start=TimingClock::now();
         const auto result=backend->end_frame(end);
+        if(XR_FAILED(result))failure("xrEndFrame",result);
 #ifdef CHEEKY_FG_LIFETIME_DIAGNOSTICS
         if(XR_FAILED(result)&&trace&&end) {
             char message[384]{};

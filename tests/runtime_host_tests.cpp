@@ -2,6 +2,7 @@
 #include "runtime_api.hpp"
 #include "processing_owner.hpp"
 #include "mock_ngx_parameters.hpp"
+#include "../shared/logging_policy.hpp"
 #include <Windows.h>
 #include <d3d11_4.h>
 #include <d3d12.h>
@@ -598,11 +599,13 @@ void verify_transport(CheekyRuntimeCommandFn command, CheekyRuntimeSnapshotFn ge
 int main(int argc, char** argv) {
     try {
         bool ota_transport{}, ota_only{};
+        bool logging_test{};
         bool uevr{}, dx11{}, conflict{}, optiscaler{}, transport{}, forwarded_transport{},depth24{},backpressure{},init_failure{},release_drain{};
         unsigned openvr_version{}, libovr_mode{};
         for (int i = 1; i < argc; ++i) {
             const std::string arg = argv[i];
             if (arg == "--dx11") dx11 = true;
+            else if (arg == "--logging") logging_test = true;
             else if (arg == "--libovr") libovr_mode = 1;
             else if (arg == "--libovr-legacy") libovr_mode = 2;
             else if (arg == "--libovr-borrowed") libovr_mode = 3;
@@ -724,9 +727,15 @@ int main(int argc, char** argv) {
         bad = input; bad.renderer = UINT32_MAX; require(!start(&bad), "Reject unsupported renderer");
         bad = input; bad.host = static_cast<CheekyRuntimeHost>(99); require(!start(&bad), "Reject unknown host");
         if (conflict) {
+            cheeky::logging::set_enabled(false);
             require(!start(&input) && attachment == 0, "Generic host cannot steal another integration's owner");
             const auto text = snapshot(get);
             require(contains(text, "Another Cheeky integration") && contains(text, "\"processing\":false"), "Owner conflict reported and processing disabled");
+            const auto log_path = directory / (uevr ? L"CheekyFoveatedDLSS-UEVR.log" :
+                optiscaler ? L"CheekyFoveatedDLSS-OptiScaler.log" : L"CheekyFoveatedDLSS-Standalone.log");
+            std::ifstream log_file(log_path);
+            const std::string log_text((std::istreambuf_iterator<char>(log_file)), {});
+            require(contains(log_text, "[1] Another Cheeky integration"), "Errors reach the log while logging is disabled");
             CloseHandle(other_owner);
             puts("PASS: generic runtime ownership conflict");
             return 0;
@@ -736,6 +745,37 @@ int main(int argc, char** argv) {
             saved << "[CheekyFoveatedDLSS]\nSchemaVersion=1\nD3D11D3D12Transport=true\n";
         }
         require(start(&input) && attachment != 0, "Start before graphics discovery");
+        if (logging_test) {
+            const auto log_path = directory / (uevr ? L"CheekyFoveatedDLSS-UEVR.log" :
+                optiscaler ? L"CheekyFoveatedDLSS-OptiScaler.log" : L"CheekyFoveatedDLSS-Standalone.log");
+            require(command(attachment, "1\n9001\nset\nLoggingEnabled=false"), "Apply logging toggle");
+            require(!cheeky::logging::enabled() && contains(snapshot(get), "\"LoggingEnabled\":false"),
+                "Runtime toggle is immediately visible across DLL boundaries and in snapshots");
+            bool saved{};
+            for(unsigned i=0;i<1000&&!saved;++i) {
+                std::ifstream config_file(directory / "CheekyFoveatedDLSS.ini");
+                const std::string config_text((std::istreambuf_iterator<char>(config_file)), {});
+                saved=contains(config_text,"LoggingEnabled=0\n");
+                if(!saved)Sleep(10);
+            }
+            require(saved,"Live logging toggle is persisted by the runtime");
+            auto size = std::filesystem::file_size(log_path);
+            for (unsigned i = 0; i < 100; ++i)
+                command(attachment, "1\n9002\nmark_vram_baseline");
+            require(std::filesystem::file_size(log_path) == size, "Disabled routine logging writes zero bytes");
+            std::uint64_t duplicate_attachment{};
+            auto duplicate = input; duplicate.attachment = &duplicate_attachment;
+            require(!start(&duplicate), "Duplicate attachment rejected");
+            require(std::filesystem::file_size(log_path) > size, "Warnings remain logged");
+            require(command(attachment, "1\n9003\nset\nLoggingEnabled=true") && cheeky::logging::enabled(),
+                "Logging can be re-enabled live");
+            size = std::filesystem::file_size(log_path);
+            command(attachment, "1\n9004\nmark_vram_baseline");
+            require(std::filesystem::file_size(log_path) > size, "Re-enabling resumes routine file writes");
+            detach(attachment);
+            puts("PASS: live process-wide logging, zero routine writes, warnings and re-enable");
+            return 0;
+        }
         if (uevr) require(contains(snapshot(get), "\"D3D11D3D12Transport\":true"), "UEVR loads saved transport preference");
         if (libovr_mode) {
             verify_libovr(libovr_mode, fake_libovr, fake_pvr, get, command, attachment);

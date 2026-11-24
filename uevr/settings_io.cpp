@@ -97,6 +97,7 @@ bool set_named_setting(Settings& s, std::string_view key, std::string_view value
     return false;
 }
 std::string_view setting_group(std::string_view key) {
+    if (key == "LoggingEnabled") return "logging";
     if(key.starts_with("Quad"))return "gaze";
     if (key.starts_with("Fg")) return "fg";
     if (key.starts_with("Nr")) return "nr";
@@ -154,6 +155,7 @@ bool read_settings_file(const std::filesystem::path& path, Settings& s, std::str
     auto candidate = s;
     candidate.fg = Settings{}.fg;
     candidate.d3d12_lower_hook = true; // Older files use the new lower-hook default.
+    candidate.logging_enabled = true;
     candidate.manual_stereo_mapping = false;
     candidate.manual_stereo_right_first = false;
     candidate.quad_manual_assignment=false;candidate.quad_show_numbers=false;

@@ -3,6 +3,7 @@
 #include "runtime_host_api.hpp"
 #include "overlay.hpp"
 #include "../shared/startup_diagnostics.hpp"
+#include "../shared/logging_policy.hpp"
 #include <d3d11.h>
 #include <d3d12.h>
 #include <dxgi1_6.h>
@@ -60,7 +61,7 @@ constexpr GUID color_key{0x721c2760,0x327d,0x46cf,{0x94,0x82,0x55,0x3d,0x2e,0xf9
 ComPtr<ID3D12Device> observer_device;
 ComPtr<ID3D12CommandQueue> observer_queue;
 
-void log_host(const char* message) noexcept {
+void write_host_log(const char* message) noexcept {
     cheeky::startup::PreserveError error;
     std::lock_guard lock(log_mutex);
     OutputDebugStringA(message);
@@ -69,6 +70,13 @@ void log_host(const char* message) noexcept {
     char line[1024]{};
     const auto count=snprintf(line,sizeof(line),"%02u:%02u:%02u.%03u [P%lu T%lu] %s\r\n",time.wHour,time.wMinute,time.wSecond,time.wMilliseconds,GetCurrentProcessId(),GetCurrentThreadId(),message);
     if (count>0) { DWORD written{}; WriteFile(host_log,line,static_cast<DWORD>((std::min)(static_cast<std::size_t>(count),sizeof(line)-1)),&written,nullptr); }
+}
+
+void log_host(const char* message) noexcept {
+    if (cheeky::logging::enabled()) write_host_log(message);
+}
+void log_host_error(const char* message) noexcept {
+    write_host_log(message);
 }
 
 void* method(void* object, unsigned slot) { return (*static_cast<void***>(object))[slot]; }
@@ -144,8 +152,11 @@ void present_frame(IDXGISwapChain* chain, UINT flags) noexcept {
         cheeky::standalone::overlay_present(chain, queue.Get(), ui);
         static const char* last_status{};
         const auto status=cheeky::standalone::overlay_status();
-        if (status!=last_status) { log_host(status); last_status=status; }
-    } catch (...) { log_host("Standalone presentation failed; game presentation continues"); }
+        if (status!=last_status) {
+            if (cheeky::logging::should_log(cheeky::standalone::overlay_status_level())) write_host_log(status);
+            last_status=status;
+        }
+    } catch (...) { log_host_error("Standalone presentation failed; game presentation continues"); }
 }
 using PresentFn = HRESULT(STDMETHODCALLTYPE*)(IDXGISwapChain*,UINT,UINT);
 using Present1Fn = HRESULT(STDMETHODCALLTYPE*)(IDXGISwapChain1*,UINT,UINT,const DXGI_PRESENT_PARAMETERS*);
@@ -354,22 +365,22 @@ bool start_host(std::uint32_t host,bool vulkan) {
         cheeky::startup::Step resolve(log_host,"host_resolve_runtime_api");
         if (!runtime || !load(runtime,"CheekyRuntime_Start",start) || !load(runtime,"CheekyRuntime_Tick",runtime_tick) ||
             !load(runtime,"CheekyRuntime_Command",runtime_command) || !load(runtime,"CheekyRuntime_Snapshot",runtime_snapshot) ||
-            !load(runtime,"CheekyRuntime_Detach",runtime_detach)) { resolve.end("win32",GetLastError()); log_host("Runtime missing or API incompatible"); return false; }
+            !load(runtime,"CheekyRuntime_Detach",runtime_detach)) { resolve.end("win32",GetLastError()); log_host_error("Runtime missing or API incompatible"); return false; }
         resolve.end();
         CheekyRuntimeStart input;
         const auto config=directory.wstring();
         input.config_directory=config.c_str(); input.attachment=&attachment;
         input.host=static_cast<CheekyRuntimeHost>(host);
         if (!cheeky::startup::status(log_host,"host_runtime_start","success",[&] { return start(&input); })) {
-            log_host("Resident runtime refused startup; see its log"); return false; }
+            log_host_error("Resident runtime refused startup; see its log"); return false; }
         if (!vulkan && !cheeky::startup::status(log_host,"host_graphics_discovery","success",[] { return install_graphics_hooks(); })) {
-            runtime_detach(attachment); attachment=0; log_host("Graphics hook discovery failed"); return false; }
+            runtime_detach(attachment); attachment=0; log_host_error("Graphics hook discovery failed"); return false; }
         active_host=host; started=true;
         log_host("Host ready; waiting for game graphics. F8 opens settings.");
         return true;
     } catch (...) {
         if (runtime_detach && attachment && !started) { runtime_detach(attachment); attachment=0; }
-        log_host("Host startup exception contained");
+        log_host_error("Host startup exception contained");
         return false;
     }
 }

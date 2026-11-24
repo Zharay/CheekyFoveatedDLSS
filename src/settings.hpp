@@ -95,6 +95,7 @@ struct Settings {
         bool force_reflex_off{true}; // Per-game override, independent of FG enable.
     } fg;
     bool enabled{true};
+    bool logging_enabled{true};
     bool d3d12_lower_hook{true}; // Applied at interception startup; changes require a restart.
     bool d3d11_use_d3d12_transport{false};
     bool d3d12_quad_compose_wait{true}; // D3D12 quad views: xrEndFrame waits for the composition GPU work.

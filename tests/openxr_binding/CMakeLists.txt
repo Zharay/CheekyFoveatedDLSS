@@ -29,6 +29,7 @@ endforeach()
 set_target_properties(CheekyOpenXRBindingTests PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/$<CONFIG>")
 add_test(NAME OpenXRHostBindings COMMAND CheekyOpenXRBindingTests)
+add_test(NAME OpenXRLogging COMMAND CheekyOpenXRBindingTests --logging)
 add_test(NAME OpenXRStereoAlignment COMMAND CheekyOpenXRBindingTests --openxr-stereo-alignment)
 add_test(NAME OpenXRNativeNr COMMAND CheekyOpenXRBindingTests --nr-native)
 add_test(NAME OpenXRMenuNonblocking COMMAND CheekyOpenXRBindingTests --menu-nonblocking)

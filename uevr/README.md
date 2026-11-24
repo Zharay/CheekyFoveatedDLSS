@@ -57,6 +57,13 @@ together when updating.
 
 The OpenXR installation is shared across games. Install all plugin files and the layer from the same release when updating.
 
+Under **Support**, **Enable diagnostic logging** controls routine logs across
+Cheeky's runtime and matching OpenXR layer. It defaults to on, persists per game
+as `LoggingEnabled`, and applies without restarting through the normal edit/apply
+controls. Warnings, errors and emergency crash diagnostics are always retained.
+Turn it on before reproducing a bug for a support ZIP. It does not change UEVR's
+own logging.
+
 ## First-use check
 
 For AFW, follow the dedicated instructions below. Per-eye mode uses the usual eye calibration setup.

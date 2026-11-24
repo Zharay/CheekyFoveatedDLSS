@@ -93,6 +93,23 @@ void wait_gpu(ID3D12Device* device, ID3D12CommandQueue* queue) {
 }
 void settings_tests(const std::filesystem::path& root) {
     {
+        Settings logging;
+        std::string error;
+        require(set_named_setting(logging, "LoggingEnabled", "false"), "Disable diagnostic logging");
+        require(write_settings_file(root / "logging.ini", logging, error), "Save logging toggle");
+        Settings loaded;
+        require(read_settings_file(root / "logging.ini", loaded, error) && !loaded.logging_enabled,
+            "Logging toggle survives INI round trip");
+        require(!set_named_setting(loaded, "LoggingEnabled", "invalid") && !loaded.logging_enabled,
+            "Invalid logging toggle preserves selection");
+        for (const auto group : {"sr", "fg", "nr", "gaze"})
+            require(reset_settings_group(loaded, group) && !loaded.logging_enabled,
+                "Processing group resets must not change logging");
+        std::ofstream(root / "old-logging.ini") << "[CheekyFoveatedDLSS]\nSchemaVersion=1\n";
+        require(read_settings_file(root / "old-logging.ini", loaded, error) && loaded.logging_enabled,
+            "Older profiles restore existing logging behavior");
+    }
+    {
         Settings nr;
         require(nr.nr_universal.optical_preset==2&&nr.nr_universal.optical_percent==25&&nr.nr_universal.optical_grid==4,
             "Universal NR owns Fast/25%/4x4 defaults independently of FG");

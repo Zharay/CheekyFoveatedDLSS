@@ -100,9 +100,10 @@ void Worker::reset() noexcept {
     allocate=nullptr;destroy=nullptr;create=nullptr;evaluate=nullptr;release=nullptr;
     configured=false;serial=prepared_serial=0;width=height=0;init=nullptr;capabilities=nullptr;
 }
-void Worker::report(const char* stage,std::uint32_t code) noexcept {
+void Worker::report(const char* stage,std::uint32_t code,bool is_error) noexcept {
     sprintf_s(diagnostic,"%s: 0x%08x",stage,code);
-    if(trace)trace(diagnostic);
+    const auto sink=is_error&&error_trace?error_trace:trace;
+    if(sink)sink(diagnostic);
 }
 bool Worker::record_output_copies(ID3D12GraphicsCommandList* commands,
     const std::array<ID3D12Resource*,2>& sources,const std::array<OutputCopy,2>& copies) noexcept {
@@ -148,10 +149,10 @@ bool Worker::probe(ID3D12Device* dev,const wchar_t* model_directory) noexcept {
     context.info.PathListInfo.Path=context.paths;context.info.PathListInfo.Length=1;
     auto result=init("eec05a21-0120-42fa-a51a-eafae09e4cdc",NVSDK_NGX_ENGINE_TYPE_CUSTOM,
         "CheekyFoveatedDLSS",context.cache.c_str(),dev,&context.info,NVSDK_NGX_Version_API);
-    report("NGX SDK initialization",result);
+    report("NGX SDK initialization",result,!ok(result));
     if(!ok(result)){failed=true;return false;}
     NgxParameters* caps{};result=capabilities(&caps);
-    report("NGX capability parameters",result);
+    report("NGX capability parameters",result,!ok(result)||!caps);
     if(!ok(result)||!caps){failed=true;return false;}
     int available{},needs_driver{};unsigned feature_result{},major{},minor{};
     const auto available_result=caps->Get(NVSDK_NGX_Parameter_FrameGeneration_Available,&available);
@@ -508,7 +509,7 @@ bool Worker::generate(const CheekyFgPair& guides,const std::array<ID3D12Resource
         p->Set("DLSSG.BackbufferFormat",unsigned(desc.Format));p->Set("DLSSG.InternalWidth",gw);p->Set("DLSSG.InternalHeight",gh);p->Set("DLSSG.DynamicResolution",1u);
         if(!f.handle) {
             apply_dlssg_preset(p,dlssg_preset);
-            const auto result=create(commands,NVSDK_NGX_Feature_FrameGeneration,p,&f.handle);report("NGX FG CreateFeature",result);
+            const auto result=create(commands,NVSDK_NGX_Feature_FrameGeneration,p,&f.handle);report("NGX FG CreateFeature",result,!ok(result)||!f.handle);
 #ifdef CHEEKY_FG_LIFETIME_DIAGNOSTICS
             if(trace) {
                 char message[256]{};

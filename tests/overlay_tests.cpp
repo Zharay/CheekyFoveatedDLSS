@@ -273,6 +273,7 @@ void test_ui_diagnostics() {
     require(text.find("DLSS-NR region: 1000 x 800 (25.0% of original) at 100,200") != text.npos, "NR region comparison missing");
     require(text.find("Last NGX result: 0x00000001") != text.npos, "NR result missing");
     render("Diagnostics", false); text = render("Diagnostics", false);
+    require(text.find("Enable diagnostic logging") != text.npos, "Logging toggle belongs in Diagnostics");
     require(text.find("Eye tracking details") != text.npos && text.find("Eye calibration diagnostics") != text.npos, "Diagnostic groups missing");
     require(text.find("Corrections applied") == text.npos && text.find("Sample age") == text.npos, "Detailed diagnostics should start collapsed");
     require(text.find("10.00 ms (100.0 FPS)") != text.npos && text.find("D3D12: Active") != text.npos &&

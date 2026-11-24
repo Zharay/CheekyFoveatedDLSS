@@ -663,7 +663,7 @@ struct BufferedBackend12 final : FrameBackend {
             // Universal DLSS 5 images hold the capture's bits in a non-sRGB format;
             // FG and the presenter must still treat them as the captured format.
             if(job->universal_nr&&job->color[0]->presentation_format!=DXGI_FORMAT_UNKNOWN)d.Format=job->color[0]->presentation_format;
-            owner.worker.trace=owner.trace;owner.worker.input_color_state=D3D12_RESOURCE_STATE_GENERIC_READ;
+            owner.worker.trace=owner.trace;owner.worker.error_trace=owner.error_trace;owner.worker.input_color_state=D3D12_RESOURCE_STATE_GENERIC_READ;
             const auto& color_layout=job->color[0]->layout;
             if(owner.worker.initialize(owner.device.Get(),owner.generation_queue.Get(),color_layout.width?color_layout.width:unsigned(d.Width),color_layout.height?color_layout.height:d.Height,d.Format,cheeky_fg_needs_ngx(job_guides->pair))) {
                 for(unsigned eye=0;eye<2;++eye){owner.worker.color_layouts[eye]=job->color[eye]->layout;owner.worker.previous_layouts[eye]=previous->color[eye]->layout;}

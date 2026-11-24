@@ -866,7 +866,7 @@ void trace_format_support(
         // Device/NGX initialization can take tens of milliseconds. Retrying
         // every frame makes even the native DX11 fallback unusably slow.
         entry->initialization_retry_after = GetTickCount64() + 5000ULL;
-        trace_event("Private DX12 transport initialization failed; retry deferred for 5 seconds");
+        trace_error("Private DX12 transport initialization failed; retry deferred for 5 seconds");
         return nullptr;
     }
     release(entry->device11);
@@ -1146,7 +1146,7 @@ void trace_format_support(
         if(n<=8 || (n&(n-1))==0) {
             D3D11_TEXTURE2D_DESC desc{};ID3D11Texture2D* texture{};
             if(SUCCEEDED(depth->QueryInterface(IID_PPV_ARGS(&texture)))){texture->GetDesc(&desc);texture->Release();}
-            trace_event("DX11 depth conversion failed stage=%s hr=0x%08X sourceFormat=%u srvFormat=%u texture=%ux%u bind=0x%X misc=0x%X samples=%u array=%u crop=%u,%u %ux%u count=%llu",
+            trace_error("DX11 depth conversion failed stage=%s hr=0x%08X sourceFormat=%u srvFormat=%u texture=%ux%u bind=0x%X misc=0x%X samples=%u array=%u crop=%u,%u %ux%u count=%llu",
                 stage,static_cast<unsigned>(hr),static_cast<unsigned>(source_format),static_cast<unsigned>(srv_format),
                 desc.Width,desc.Height,desc.BindFlags,desc.MiscFlags,desc.SampleDesc.Count,desc.ArraySize,source_x,source_y,width,height,n);
         }

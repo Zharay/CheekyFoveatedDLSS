@@ -9,6 +9,7 @@
 #include "menu_cursor_draw.hpp"
 #include "../shared/openxr_menu_bridge.hpp"
 #include "../shared/openxr_menu_shared11.hpp"
+#include "../shared/logging_policy.hpp"
 void report_openxr_menu_diagnostic(const char* message) noexcept {
     const auto host = GetModuleHandleW(L"CheekyFoveatedDLSSHost.dll");
     const auto report = host ? reinterpret_cast<CheekyOpenXRMenuDiagnosticFn>(
@@ -60,6 +61,7 @@ constexpr GUID overlay_metadata_guid{0x9dbb7074, 0x42a8, 0x4bca, {0xb4, 0x4e, 0x
 struct ChainMetadata { std::uint64_t identity{}; DXGI_COLOR_SPACE_TYPE color_space{}; };
 std::atomic<std::uint64_t> chain_sequence{};
 std::atomic<const char*> status{"Waiting for a supported foreground swap chain"};
+std::atomic<int> status_level{3};
 
 ChainMetadata chain_metadata(IDXGISwapChain* swapchain, DXGI_FORMAT format) {
     ChainMetadata result; UINT size = sizeof(result);
@@ -76,8 +78,9 @@ int shader_color_mode(DXGI_COLOR_SPACE_TYPE space, DXGI_FORMAT format) {
         format == DXGI_FORMAT_R8G8B8A8_UNORM_SRGB || format == DXGI_FORMAT_B8G8R8A8_UNORM_SRGB ? 3 : 0;
 }
 
-void set_status(const char* text) {
-    if (status.exchange(text) != text) {
+void set_status(const char* text, int level = 2) {
+    status_level.store(level);
+    if (status.exchange(text) != text && cheeky::logging::should_log(level)) {
         OutputDebugStringA("[Cheeky overlay] ");
         OutputDebugStringA(text);
         OutputDebugStringA("\n");
@@ -326,7 +329,7 @@ bool initialize(Renderer& r, IDXGISwapChain* swapchain, ID3D12CommandQueue* queu
     static std::atomic_flag initialized{};
     if (!initialized.test_and_set(std::memory_order_relaxed))
         log_overlay_diagnostic("STARTUP milestone=overlay_initialized");
-    set_status("Menu ready (SDR, scRGB and HDR10)");
+    set_status("Menu ready (SDR, scRGB and HDR10)", 3);
     return true;
 }
 
@@ -375,7 +378,7 @@ bool prepare_headset(Renderer& r) {
         if (!r.xr_menu_owner) {
             hide_headset(r);
             r.xr_menu_owner = true;
-            set_status("Headset menu backend: OpenXR exclusively (OpenVR publishing disabled)");
+            set_status("Headset menu backend: OpenXR exclusively (OpenVR publishing disabled)", 3);
         }
         return prepare_headset_texture(r);
     }
@@ -720,7 +723,7 @@ void overlay_present(IDXGISwapChain* swapchain, ID3D12CommandQueue* queue, const
         global.desktop_activity = r.input->desktop_pointer_tick.load();
         if (menu_open != r.menu_was_open) {
             r.menu_was_open = menu_open;
-            set_status(menu_open ? "Menu opened" : "Menu closed");
+            set_status(menu_open ? "Menu opened" : "Menu closed", 3);
         }
         cheeky_overlay_color_mode = shader_color_mode(color_space, r.format);
         ContextScope scope(r.context);
@@ -1019,4 +1022,5 @@ void overlay_set_color_space(IDXGISwapChain* swapchain, std::uint32_t color_spac
 }
 
 const char* overlay_status() noexcept { return status.load(); }
+int overlay_status_level() noexcept { return status_level.load(); }
 }

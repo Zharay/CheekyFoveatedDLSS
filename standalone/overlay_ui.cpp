@@ -1666,6 +1666,8 @@ void draw_overlay_ui(OverlayUiState& r,const OverlayRuntime& runtime,InputState&
                 end_tab();
             }
             if (begin_tab("Diagnostics")) {
+                ImGui::Checkbox("Enable diagnostic logging", &r.draft.logging_enabled);
+                if (ImGui::IsItemHovered()) ImGui::SetTooltip("Applies immediately across Cheeky. Warnings, errors and crash diagnostics remain enabled. Turn on before reproducing a bug.");
                 draw_diagnostics_summary(r, status);
                 ImGui::SeparatorText("Support");
                 if (ImGui::Button("Report an issue...")) command(r, runtime, "report_issue");

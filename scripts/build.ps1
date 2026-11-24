@@ -93,6 +93,8 @@ foreach ($gazeMode in @('--manual-gaze', '--openxr-independent-on', '--openxr-in
 }
 & (Join-Path $projectRoot "bin\$Configuration\CheekyOpenXRBindingTests.exe")
 if ($LASTEXITCODE -ne 0) { throw "OpenXR binding and pointer regressions failed." }
+& (Join-Path $projectRoot "bin\$Configuration\CheekyOpenXRBindingTests.exe") --logging
+if ($LASTEXITCODE -ne 0) { throw "OpenXR logging regression failed." }
 & (Join-Path $projectRoot "bin\$Configuration\CheekyOpenXRBindingTests.exe") --openxr-stereo-alignment
 if ($LASTEXITCODE -ne 0) { throw "Direct OpenXR stereo alignment regressions failed." }
 & (Join-Path $projectRoot "bin\$Configuration\CheekyOpenXRBindingTests.exe") --nr-native
@@ -157,6 +159,10 @@ foreach ($mode in @("native", "native-c", "streamline", "missing-lower", "public
 }
 
 $runtimeHostTest = Join-Path $projectRoot "bin\$Configuration\CheekyRuntimeHostTests.exe"
+foreach ($arguments in @(@('--logging'), @('--logging', '--uevr'))) {
+    & $runtimeHostTest @arguments
+    if ($LASTEXITCODE -ne 0) { throw "Runtime logging regression failed: $arguments" }
+}
 foreach ($arguments in @(@(), @('--dx11'), @('--optiscaler'), @('--optiscaler','--dx11'), @('--conflict'), @('--transport'), @('--uevr','--transport'), @('--transport-init-failure'), @('--transport-release-drain'), @('--optiscaler','--transport'), @('--transport-forwarded'), @('--optiscaler','--transport-forwarded'))) {
     & $runtimeHostTest @arguments
     if ($LASTEXITCODE -ne 0) { throw "Generic runtime tests failed: $arguments" }

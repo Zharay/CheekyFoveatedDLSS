@@ -99,8 +99,9 @@ struct Worker {
     unsigned max_generated_frames{1};
     char diagnostic[384]{"NGX capability has not been checked"};
     void (*trace)(const char*) noexcept {};
+    void (*error_trace)(const char*) noexcept {};
     bool probe(ID3D12Device*,const wchar_t* model_directory=nullptr) noexcept;
-    void report(const char* stage,std::uint32_t code) noexcept;
+    void report(const char* stage,std::uint32_t code,bool is_error=true) noexcept;
     ~Worker(){reset();}
     bool wait_idle(const char* site="idle") noexcept;
     bool wait_fence(std::uint64_t value,const char* site="idle") noexcept;

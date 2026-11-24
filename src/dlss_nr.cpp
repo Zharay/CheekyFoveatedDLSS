@@ -378,7 +378,7 @@ void evict_retired_features(ViewState& view) noexcept {
     if (!ngx_succeeded(result)) {
         runtime.state = 3U;
         diagnostics.state = DlssNrState::runtime_failed;
-        trace_event("DLSS-NR Init_Ext failed result=0x%08X", result);
+        trace_error("DLSS-NR Init_Ext failed result=0x%08X", result);
         return false;
     }
     runtime.allocate_parameters = allocate;
@@ -584,7 +584,7 @@ void evict_retired_features(ViewState& view) noexcept {
         diagnostics.state = DlssNrState::unsupported_resources;
         diagnostics.last_result = static_cast<NgxResult>(result);
         ++diagnostics.failed_calls;
-        trace_event("DLSS-NR GPU setup failed stage=%s hr=0x%08X", stage, result);
+        trace_error("DLSS-NR GPU setup failed stage=%s hr=0x%08X", stage, result);
         return false;
     };
 
@@ -921,7 +921,7 @@ void evict_retired_features(ViewState& view) noexcept {
     }
     if (FAILED(result)) {
         gpu.pass_output = nullptr;
-        trace_event("DLSS-NR pass output creation failed hr=0x%08X; running one pass", result);
+        trace_error("DLSS-NR pass output creation failed hr=0x%08X; running one pass", result);
         return false;
     }
     gpu.pass_output->SetName(L"Cheeky DLSS-NR pass output");

@@ -2,6 +2,7 @@
 #include "quad_view_bridge.hpp"
 #include "reflex_override_state.hpp"
 #include "../shared/fg_dlssg_preset.hpp"
+#include "../shared/logging_policy.hpp"
 
 #include <algorithm>
 #include <atomic>
@@ -198,6 +199,7 @@ Settings configured_settings() noexcept {
     settings.nr_extra_passes = nr_extra_passes;
     settings.nr_universal = nr_universal;
     settings.enabled = enabled.load(std::memory_order_acquire);
+    settings.logging_enabled = cheeky::logging::enabled();
     settings.d3d12_lower_hook = d3d12_lower_hook.load(std::memory_order_acquire);
     settings.d3d11_use_d3d12_transport =
         d3d11_use_d3d12_transport.load(std::memory_order_acquire);
@@ -318,6 +320,7 @@ Settings current_settings() noexcept {
 
 void update_settings(const Settings& settings) noexcept {
     std::unique_lock lock(settings_mutex);
+    cheeky::logging::set_enabled(settings.logging_enabled);
     fg_settings = settings.fg;
     nr_passes = std::clamp(settings.nr_passes, 1U, max_nr_passes);
     for (std::size_t i = 0; i < nr_extra_passes.size(); ++i)

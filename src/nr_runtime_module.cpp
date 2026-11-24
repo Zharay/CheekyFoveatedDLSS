@@ -143,7 +143,7 @@ NrRuntimeModule load_nr_runtime_module() noexcept {
     if (slash) *slash = L'\0'; else executable[0] = L'\0';
     const auto loaded = load_runtime_library(L"nvngx_dlssnr.dll", cached.directory.data(), executable.data(),
         [](const wchar_t* path, DWORD error) {
-            trace_event("DLSS-NR runtime search path=%ls error=%lu", path, static_cast<unsigned long>(error));
+            trace_error("DLSS-NR runtime search path=%ls error=%lu", path, static_cast<unsigned long>(error));
         });
     cached.module = loaded.module;
     if (cached.module == nullptr) {
@@ -158,7 +158,7 @@ NrRuntimeModule load_nr_runtime_module() noexcept {
             &original_get_module_file_name
         )) {
         cached.module=nullptr;cached.error=ERROR_PROC_NOT_FOUND;
-        trace_event("DLSS-NR runtime identity import patch failed");
+        trace_error("DLSS-NR runtime identity import patch failed");
         return cached;
     }
     original_module_name = reinterpret_cast<GetModuleFileNameWFn>(
@@ -185,7 +185,7 @@ HMODULE load_ngx_core_runtime() noexcept {
         if (path.back() != L'\\' && path.back() != L'/') path += L'\\';
         path += L"_nvngx.dll";
         const auto module = LoadLibraryExW(path.c_str(), nullptr, LOAD_WITH_ALTERED_SEARCH_PATH);
-        trace_event("DLSS-NR NGX core search path=%ls error=%lu", path.c_str(),
+        trace_error("DLSS-NR NGX core search path=%ls error=%lu", path.c_str(),
             static_cast<unsigned long>(module ? 0U : GetLastError()));
         return module;
     };

@@ -777,19 +777,27 @@ bool configure_graphics(State& s, std::uint32_t renderer, void* device, void* qu
 }
 }
 void set_addon_modules(HMODULE, HMODULE) noexcept {}
-void trace_event(const char* format, ...) noexcept {
+void write_trace(const char* format, va_list args) noexcept {
     if (!format) return;
     cheeky::startup::PreserveError error;
     auto& s = state(); std::lock_guard lock(s.log_mutex);
     if (s.log == INVALID_HANDLE_VALUE) return;
     char message[3072]{};
-    va_list args; va_start(args, format); vsnprintf_s(message, sizeof(message), _TRUNCATE, format, args); va_end(args);
+    vsnprintf_s(message, sizeof(message), _TRUNCATE, format, args);
     SYSTEMTIME now; GetLocalTime(&now); char line[3328]{};
     const auto n = snprintf(line, sizeof(line), "%02u:%02u:%02u.%03u [P%lu T%lu] %s\r\n", now.wHour, now.wMinute, now.wSecond, now.wMilliseconds, GetCurrentProcessId(), GetCurrentThreadId(), message);
     if (n > 0) { DWORD written; WriteFile(s.log, line, static_cast<DWORD>((std::min)(static_cast<std::size_t>(n), sizeof(line)-1)), &written, nullptr); }
 }
+void trace_event(const char* format, ...) noexcept {
+    if (!cheeky::logging::enabled()) return;
+    va_list args; va_start(args, format); write_trace(format, args); va_end(args);
+}
 void close_trace_log() noexcept {} // The runtime and log stay resident until process exit.
-void log_message(int level, const char* message) noexcept { trace_event("[%d] %s", level, message ? message : ""); }
+void trace_level(int level, const char* format, ...) noexcept {
+    if (!cheeky::logging::should_log(level)) return;
+    va_list args; va_start(args, format); write_trace(format, args); va_end(args);
+}
+void log_message(int level, const char* message) noexcept { trace_level(level, "[%d] %s", level, message ? message : ""); }
 void log_info(const char* message) noexcept { log_message(3, message); }
 void log_warning(const char* message) noexcept { log_message(2, message); }
 void log_error(const char* message) noexcept { log_message(1, message); }

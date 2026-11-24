@@ -30,4 +30,5 @@ void overlay_set_color_space(IDXGISwapChain*, std::uint32_t color_space) noexcep
 void overlay_shutdown() noexcept;
 // Static strings; useful when logging why the menu cannot render.
 const char* overlay_status() noexcept;
+int overlay_status_level() noexcept;
 }

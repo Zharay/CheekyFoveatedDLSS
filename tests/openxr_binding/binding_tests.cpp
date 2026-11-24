@@ -1239,6 +1239,33 @@ void diagnostic_lifetime_test() {
 #include "color_scale_bias_validation.hpp"
 #include "nr_native_validation.hpp"
 int main(int argc,char** argv) {
+    if(argc>1&&std::string(argv[1])=="--logging") {
+        try {
+            cheeky::logging::set_enabled(false);
+            const auto path=cheeky::openxr_startup_log_path();
+            const auto initial=std::filesystem::exists(path)?std::filesystem::file_size(path):0;
+            for(unsigned i=0;i<100;++i)log_startup("quiet trace\n");
+            check(!std::filesystem::exists(path)||std::filesystem::file_size(path)==initial,
+                "Disabled OpenXR logging writes zero bytes");
+            check(cheeky_xrCreateApiLayerInstance(nullptr,nullptr,nullptr)==XR_ERROR_INITIALIZATION_FAILED,
+                "Invalid creation still reports an error");
+            const auto after_error=std::filesystem::file_size(path);
+            check(after_error>initial,"OpenXR errors are retained");
+            cheeky::fg::Worker worker;
+            worker.trace=[](const char* message) noexcept {log_startup("%s\n",message);};
+            worker.error_trace=[](const char* message) noexcept {log_startup_error("%s\n",message);};
+            worker.report("NGX SDK initialization",1,false);
+            check(std::filesystem::file_size(path)==after_error,"FG success diagnostics stay suppressed");
+            worker.report("NGX FG EvaluateFeature",0xBAD);
+            const auto after_fg_error=std::filesystem::file_size(path);
+            check(after_fg_error>after_error,"FG worker errors survive logging suppression");
+            cheeky::logging::set_enabled(true);
+            log_startup("logging restored\n");
+            check(std::filesystem::file_size(path)>after_fg_error,"OpenXR logging resumes live");
+            std::cout<<"PASS: OpenXR logging suppression, errors and re-enable\n";
+            return 0;
+        } catch(const std::exception& error) {std::cerr<<error.what()<<'\n';return 1;}
+    }
     std::cout.setf(std::ios::unitbuf);
     try {
         if(argc>1&&std::string(argv[1])=="--openxr-stereo-alignment") {stereo_alignment_validation();return 0;}

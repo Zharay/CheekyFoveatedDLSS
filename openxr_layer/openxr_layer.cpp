@@ -16,6 +16,7 @@
 
 #include "cheeky_gaze_abi.h"
 #include "openxr_startup_log.hpp"
+#include "logging_policy.hpp"
 #include "gaze_math.hpp"
 #include "eye_calibration.hpp"
 #include "projection_selection.hpp"
@@ -1631,17 +1632,14 @@ void publish_snapshot_locked(const SessionState* const session) noexcept {
 
 enum class ExtensionAvailability { present, absent, unknown };
 
-void log_startup(const char* format, ...) noexcept {
+void write_startup_log(const char* format, va_list args) noexcept {
     // Failure to write diagnostics must never affect OpenXR. The file stays open:
     // reopening per line made every write pay for a fresh scan of the whole log.
     try {
         static std::mutex log_mutex;
         std::lock_guard lock(log_mutex);
         char message[1024]{};
-        va_list args;
-        va_start(args, format);
         vsnprintf_s(message, sizeof(message), _TRUNCATE, format, args);
-        va_end(args);
         char line[1200]{};
         _snprintf_s(line, sizeof(line), _TRUNCATE, "tick=%llu thread=%lu %s",
             GetTickCount64(), GetCurrentThreadId(), message);
@@ -1655,6 +1653,14 @@ void log_startup(const char* format, ...) noexcept {
         DWORD written{};
         WriteFile(file, line, static_cast<DWORD>(std::strlen(line)), &written, nullptr);
     } catch (...) {}
+}
+
+void log_startup(const char* format, ...) noexcept {
+    if (!cheeky::logging::enabled()) return;
+    va_list args; va_start(args, format); write_startup_log(format, args); va_end(args);
+}
+void log_startup_error(const char* format, ...) noexcept {
+    va_list args; va_start(args, format); write_startup_log(format, args); va_end(args);
 }
 
 [[nodiscard]] ExtensionAvailability extension_availability(
@@ -2300,7 +2306,7 @@ extern "C" XRAPI_ATTR XrResult XRAPI_CALL cheeky_xrCreateApiLayerInstance(
         layer_info->nextInfo == nullptr ||
         layer_info->nextInfo->nextGetInstanceProcAddr == nullptr ||
         layer_info->nextInfo->nextCreateApiLayerInstance == nullptr) {
-        log_startup("instance_create invalid_arguments result=%d\n", XR_ERROR_INITIALIZATION_FAILED);
+        log_startup_error("instance_create invalid_arguments result=%d\n", XR_ERROR_INITIALIZATION_FAILED);
         return XR_ERROR_INITIALIZATION_FAILED;
     }
 
@@ -2427,7 +2433,7 @@ extern "C" XRAPI_ATTR XrResult XRAPI_CALL cheeky_xrCreateApiLayerInstance(
         }
         if (result != XR_ERROR_EXTENSION_NOT_PRESENT) break;
     }
-    log_startup("instance_create end result=%d gaze_enabled=%u cylinder_enabled=%u\n", result,
+    (XR_FAILED(result)?log_startup_error:log_startup)("instance_create end result=%d gaze_enabled=%u cylinder_enabled=%u\n", result,
         unsigned(XR_SUCCEEDED(result) && (already_enabled || inject_extension)),
         unsigned(XR_SUCCEEDED(result) && (cylinder_enabled || inject_cylinder)));
     if (XR_FAILED(result)) return result;
@@ -2852,7 +2858,7 @@ extern "C" XRAPI_ATTR XrResult XRAPI_CALL cheeky_xrBeginSession(
     std::shared_ptr<cheeky::quad_capture::Compositor> quad;
     XrSessionBeginInfo forwarded{};
     log_startup("QUAD-CAPTURE begin_request session=%p app_configuration=%d\n",session,info?int(info->primaryViewConfigurationType):-1);
-    const auto rejected=[&](XrResult result){log_startup("QUAD-CAPTURE begin_rejected session=%p app_configuration=%d result=%d stage=provider_preflight\n",
+    const auto rejected=[&](XrResult result){log_startup_error("QUAD-CAPTURE begin_rejected session=%p app_configuration=%d result=%d stage=provider_preflight\n",
         session,info?int(info->primaryViewConfigurationType):-1,int(result));return result;};
     {
         std::lock_guard lock(state_mutex);
@@ -2884,7 +2890,7 @@ extern "C" XRAPI_ATTR XrResult XRAPI_CALL cheeky_xrBeginSession(
     const auto result = next == nullptr
         ? XR_ERROR_FUNCTION_UNSUPPORTED
         : next(session, quad ? &forwarded : info);
-    log_startup("QUAD-CAPTURE begin session=%p app_configuration=%d runtime_configuration=%d result=%d\n",session,
+    (XR_FAILED(result)?log_startup_error:log_startup)("QUAD-CAPTURE begin session=%p app_configuration=%d runtime_configuration=%d result=%d\n",session,
         info?int(info->primaryViewConfigurationType):-1,quad?int(forwarded.primaryViewConfigurationType):info?int(info->primaryViewConfigurationType):-1,int(result));
     if (XR_SUCCEEDED(result) && info != nullptr) {
         std::lock_guard lock(state_mutex);
@@ -3927,6 +3933,7 @@ std::shared_ptr<cheeky::fg::Presenter> update_fg_at_frame_boundary(
             candidate->quad_input=bool(owner.quad_capture);
             if(owner.quad_capture&&owner.quad_capture->d3d11)owner.quad_capture->d3d11->fg_bridge.reset();
             candidate->trace=[](const char* message) noexcept {log_startup("%s\n",message);};
+            candidate->error_trace=[](const char* message) noexcept {log_startup_error("%s\n",message);};
             candidate->retire_chain=[session=owner.session,destroy=d.destroy_swapchain](XrSwapchain chain) noexcept {
                 retire_private_chain(session,chain,destroy);};
             if(candidate->setup11(owner.session,fn,static_cast<ID3D11Device*>(owner.graphics_device),owner.generation,
@@ -3935,7 +3942,7 @@ std::shared_ptr<cheeky::fg::Presenter> update_fg_at_frame_boundary(
                 owner.fg=std::move(candidate);owner.fg_state=CheekyFgState::waiting_for_history;
                 log_startup("Shader FG buffered presenter initialized with native D3D11 backend; no D3D12 bridge session=%p\n",owner.session);
             }else {owner.fg_requested=false;owner.fg_state=CheekyFgState::presenter_failed;
-                log_startup("Shader FG native D3D11 initialization failed: %s\n",candidate->diagnostic_text());}
+                log_startup_error("Shader FG native D3D11 initialization failed: %s\n",candidate->diagnostic_text());}
             if(owner.quad_capture&&owner.quad_capture->d3d11&&owner.quad_capture->d3d11->fg_guides)
                 owner.quad_capture->d3d11->fg_guides->enable(bool(owner.fg));
             return {};
@@ -3946,6 +3953,7 @@ std::shared_ptr<cheeky::fg::Presenter> update_fg_at_frame_boundary(
         // bridge sends raw quad planes.
         candidate->quad_input=bool(owner.quad_capture)&&owner.graphics_api==11;
         candidate->trace=[](const char* message) noexcept {log_startup("%s\n",message);};
+        candidate->error_trace=[](const char* message) noexcept {log_startup_error("%s\n",message);};
         auto* device12=owner.graphics_api==12?static_cast<ID3D12Device*>(owner.graphics_device):nullptr;
         auto* queue12=owner.graphics_api==12?static_cast<ID3D12CommandQueue*>(owner.graphics_queue):nullptr;
         if(owner.graphics_api==11) {
@@ -3966,7 +3974,7 @@ std::shared_ptr<cheeky::fg::Presenter> update_fg_at_frame_boundary(
         } else {
             owner.fg_requested=false;
             owner.fg_state=CheekyFgState::presenter_failed;
-            log_startup("DLSS-FG presenter initialization failed session=%p\n",owner.session);
+            log_startup_error("DLSS-FG presenter initialization failed session=%p\n",owner.session);
         }
     }
     if(owner.quad_capture&&owner.quad_capture->d3d11&&owner.quad_capture->d3d11->fg_guides)

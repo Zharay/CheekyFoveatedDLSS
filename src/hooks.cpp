@@ -918,7 +918,7 @@ void trace_pointer_context(const char* const label, const void* const pointer) n
             hook.patch.data(),
             hook.patch.size()
         )) {
-        trace_event("HOOKDBG install-inline WRITE FAILED hook=%p target=%p", &hook, hook.target);
+        trace_error("HOOKDBG install-inline WRITE FAILED hook=%p target=%p", &hook, hook.target);
         hook.active = false;
         hook.target = nullptr;
         return false;

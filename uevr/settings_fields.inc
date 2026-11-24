@@ -1,4 +1,5 @@
 // Persisted settings shared with the ReShade key names.
+CHEEKY_SETTING("LoggingEnabled", logging_enabled)
 CHEEKY_SETTING("FgEnabled", fg.enabled)
 CHEEKY_SETTING("FgMultiplier", fg.multiplier)
 CHEEKY_SETTING("FgDlssgPreset", fg.dlssg_preset)
